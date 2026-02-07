@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: neue;
+  src: url("./assets/fonts/BebasNeue-Regular.woff2");
+}
