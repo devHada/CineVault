@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: neue;
-  src: url("./assets/fonts/BebasNeue-Regular.woff2");
+/* stylelint-disable */
+@theme {
+  --font-cinzel: "Cinzel", serif;
+  --font-raleway: "Raleway", sans-serif;
+}
+
+* {
+}
+button {
+  cursor: pointer;
 }
