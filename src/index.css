@@ -1,12 +1,37 @@
 @import "tailwindcss";
-
+body {
+  overflow-x: hidden;
+}
 /* stylelint-disable */
 @theme {
   --font-cinzel: "Cinzel", serif;
   --font-raleway: "Raleway", sans-serif;
 }
 
-
 button {
   cursor: pointer;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #0a0a0a;
+  --bg-surface: #111111;
+  --text-primary: #f5f0e8;
+  --text-secondary: #a0a0a0;
+  --accent: #f5c518;
+  --border: rgba(255, 255, 255, 0.08);
+  --input-bg: #31312e;
+}
+
+[data-theme="light"] {
+  --bg-primary: #eeeae4;
+  --bg-surface: #f7f4ef;
+  --text-primary: #1a2744;
+  --text-secondary: #666666;
+  --accent: #1a2744;
+  --border: rgba(0, 0, 0, 0.08);
+  --input-bg: #ffffff;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

@@ -1,7 +1,13 @@
 import React from "react";
 
+import PageTransition from "../components/layout/PageTransition";
+
 const CineAI = () => {
-  return <div>CineAI</div>;
+  return (
+    <PageTransition>
+      <section>ai</section>
+    </PageTransition>
+  );
 };
 
 export default CineAI;

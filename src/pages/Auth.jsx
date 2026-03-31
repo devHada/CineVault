@@ -65,10 +65,10 @@ const Auth = () => {
   const [currentMovie, setCurrentMovie] = useState(0);
   const { theme, toggleTheme } = useTheme();
   const Navigate = useNavigate();
-  // useEffect(() => {
-  //   const user = localStorage.getItem("cinevault-user");
-  //   if (user) Navigate("/dashboard");
-  // }, []);
+  useEffect(() => {
+    const user = localStorage.getItem("cinevault-user");
+    if (user) Navigate("/dashboard");
+  }, []);
 
   const dark = theme === "dark";
   const handleRegister = ({ name, email, password }) => {
@@ -214,7 +214,7 @@ const Auth = () => {
                   className="w-full h-full object-cover"
                 />
                 {/* gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-t from-black via-black/30 to-transparent" />
 
                 {/* movie info */}
                 <AnimatePresence>
