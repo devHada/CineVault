@@ -3,6 +3,7 @@ import { NavLink } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext";
 import { Search, Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Profile from "../../pages/Profile";
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
@@ -15,6 +16,9 @@ const Navbar = () => {
     { name: "Watchlist", path: "/watchlist" },
     { name: "CineAI", path: "/cineai" },
   ];
+  const goProfile = () => {
+    window.location.href = "/profile";
+  };
 
   return (
     <nav
@@ -104,6 +108,11 @@ const Navbar = () => {
           >
             {theme === "dark" ? "☀ Light" : "🌙 Dark"}
           </button>
+          <button
+            onClick={goProfile}
+            to="/profile"
+            className="bg-amber-50 h-10 w-10 rounded-full"
+          ></button>
         </div>
 
         {/* mobile right */}
@@ -119,6 +128,10 @@ const Navbar = () => {
           >
             {theme === "dark" ? "☀" : "🌙"}
           </button>
+          <a
+            href={<Profile />}
+            className="bg-amber-50 h-5 w-5 rounded-full"
+          ></a>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             style={{ color: "var(--text-primary)" }}

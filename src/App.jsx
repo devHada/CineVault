@@ -9,6 +9,7 @@ import Recommendations from "./pages/Recommendations";
 import NotFound from "./pages/NotFound";
 import CineAI from "./pages/CineAI";
 import { Routes, Route } from "react-router-dom";
+import Profile from "./pages/Profile";
 
 const App = () => {
   const location = useLocation();
@@ -54,6 +55,14 @@ const App = () => {
           element={
             <Layout>
               <CineAI />
+            </Layout>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <Layout>
+              <Profile />
             </Layout>
           }
         />
