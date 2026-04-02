@@ -4,12 +4,13 @@ import { useTheme } from "../../context/ThemeContext";
 import { Search, Menu, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Profile from "../../pages/Profile";
+import { useNavigate } from "react-router-dom";
 
 const Navbar = () => {
   const { theme, toggleTheme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
-
+  const navigate = useNavigate();
   const navLinks = [
     { name: "Home", path: "/dashboard" },
     { name: "Recommendations", path: "/recommendations" },
@@ -17,8 +18,11 @@ const Navbar = () => {
     { name: "CineAI", path: "/cineai" },
   ];
   const goProfile = () => {
-    window.location.href = "/profile";
+    navigate("/profile");
   };
+
+  const stored = JSON.parse(localStorage.getItem("cinevault-user") || "{}");
+  const [username, setUsername] = useState(stored.username || "CineFan");
 
   return (
     <nav
@@ -108,11 +112,27 @@ const Navbar = () => {
           >
             {theme === "dark" ? "☀ Light" : "🌙 Dark"}
           </button>
-          <button
+          <div
             onClick={goProfile}
-            to="/profile"
-            className="bg-amber-50 h-10 w-10 rounded-full"
-          ></button>
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "var(--accent)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              cursor: "pointer",
+            }}
+          >
+            <span
+              className="font-cinzel font-bold text-sm"
+              style={{ color: "#0a0a0a" }}
+            >
+              {username.charAt(0).toUpperCase()}
+            </span>
+          </div>
         </div>
 
         {/* mobile right */}
@@ -128,10 +148,27 @@ const Navbar = () => {
           >
             {theme === "dark" ? "☀" : "🌙"}
           </button>
-          <a
-            href={<Profile />}
-            className="bg-amber-50 h-5 w-5 rounded-full"
-          ></a>
+          <div
+            onClick={goProfile}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "var(--accent)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+              cursor: "pointer",
+            }}
+          >
+            <span
+              className="font-cinzel font-bold text-sm"
+              style={{ color: "#0a0a0a" }}
+            >
+              {username.charAt(0).toUpperCase()}
+            </span>
+          </div>
           <button
             onClick={() => setMenuOpen(!menuOpen)}
             style={{ color: "var(--text-primary)" }}
