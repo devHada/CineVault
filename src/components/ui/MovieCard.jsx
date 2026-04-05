@@ -3,26 +3,32 @@ import { useNavigate } from "react-router-dom";
 import { IMAGE_BASE_URL } from "../../api/tmdb";
 import { Star } from "lucide-react";
 
-const MovieCard = ({ id, title, poster, rating, year, description }) => {
+const MovieCard = ({
+  id,
+  title,
+  poster,
+  rating,
+  year,
+  description,
+  mediaType = "movie",
+}) => {
   const navigate = useNavigate();
 
   return (
     <div
-      onClick={() => navigate(`/movie/${id}`)}
+      onClick={() => navigate(`/details/${mediaType}/${id}`)}
       style={{
         background: "var(--bg-surface)",
         border: "1px solid var(--border)",
       }}
       className="rounded-xl overflow-hidden cursor-pointer group transition-all duration-300 hover:scale-105"
     >
-      {/* poster */}
       <div className="relative overflow-hidden">
         <img
           src={`${IMAGE_BASE_URL}${poster}`}
           alt={title}
           className="w-full object-cover h-64"
         />
-        {/* hover overlay */}
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
           <p
             style={{ color: "var(--text-primary)" }}
@@ -32,8 +38,6 @@ const MovieCard = ({ id, title, poster, rating, year, description }) => {
           </p>
         </div>
       </div>
-
-      {/* info */}
       <div className="p-3 flex flex-col gap-1">
         <h3
           style={{ color: "var(--text-primary)" }}

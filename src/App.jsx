@@ -3,13 +3,14 @@ import { useLocation } from "react-router-dom";
 import Layout from "./components/layout/Layout";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import MovieDetails from "./pages/MovieDetails";
+
 import Watchlist from "./pages/Watchlist";
 import Recommendations from "./pages/Recommendations";
 import NotFound from "./pages/NotFound";
 import CineAI from "./pages/CineAI";
 import { Routes, Route } from "react-router-dom";
 import Profile from "./pages/Profile";
+import Details from "./pages/Details";
 
 const App = () => {
   const location = useLocation();
@@ -27,10 +28,10 @@ const App = () => {
           }
         />
         <Route
-          path="/movie/:id"
+          path="/details/:type/:id"
           element={
             <Layout>
-              <MovieDetails />
+              <Details />
             </Layout>
           }
         />

@@ -21,9 +21,11 @@ const genres = [
   { id: 12, name: "Adventure" },
 ];
 
+// type field = "movie" | "tv" — controls /details/:type/:id routing
 const heroMovies = [
   {
     id: 245891,
+    type: "movie",
     title: "John Wick",
     genre: "Action",
     overview:
@@ -33,6 +35,7 @@ const heroMovies = [
   },
   {
     id: 19025,
+    type: "movie",
     title: "Bhool Bhulaiyaa",
     genre: "Comedy",
     overview:
@@ -42,6 +45,7 @@ const heroMovies = [
   },
   {
     id: 138843,
+    type: "movie",
     title: "The Conjuring",
     genre: "Horror",
     overview:
@@ -50,7 +54,8 @@ const heroMovies = [
     trailerKey: "k10ETZ41q5o",
   },
   {
-    id: 99861,
+    id: 1429,
+    type: "tv",
     title: "Attack on Titan",
     genre: "Anime",
     overview:
@@ -60,6 +65,7 @@ const heroMovies = [
   },
   {
     id: 157336,
+    type: "movie",
     title: "Interstellar",
     genre: "Sci-Fi",
     overview:
@@ -69,6 +75,7 @@ const heroMovies = [
   },
   {
     id: 284053,
+    type: "movie",
     title: "Doctor Strange",
     genre: "Magic",
     overview:
@@ -78,7 +85,6 @@ const heroMovies = [
   },
 ];
 
-// ── Trailer Modal ────────────────────────────────────────────────────────────
 const TrailerModal = ({ trailerKey, onClose }) => (
   <AnimatePresence>
     <motion.div
@@ -121,7 +127,6 @@ const TrailerModal = ({ trailerKey, onClose }) => (
   </AnimatePresence>
 );
 
-// ── Dashboard ────────────────────────────────────────────────────────────────
 const Dashboard = () => {
   const [trending, setTrending] = useState([]);
   const [topRated, setTopRated] = useState([]);
@@ -129,7 +134,7 @@ const Dashboard = () => {
   const [activeGenre, setActiveGenre] = useState(null);
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [activeTrailer, setActiveTrailer] = useState(null); // trailerKey string
+  const [activeTrailer, setActiveTrailer] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -139,7 +144,7 @@ const Dashboard = () => {
           getTrending(),
           getTopRated(),
         ]);
-        setTrending(trendingRes.data.results);
+        setTrending(trendingRes.data.results); // keeps movies + TV, media_type is on each item
         setTopRated(topRatedRes.data.results);
       } catch (err) {
         console.error(err);
@@ -202,7 +207,6 @@ const Dashboard = () => {
 
   return (
     <PageTransition>
-      {/* Trailer Modal */}
       {activeTrailer && (
         <TrailerModal
           trailerKey={activeTrailer}
@@ -211,7 +215,7 @@ const Dashboard = () => {
       )}
 
       <section style={{ background: "var(--bg-primary)", minHeight: "100vh" }}>
-        {/* ── Hero Swiper ── */}
+        {/* Hero */}
         <Swiper
           modules={[Pagination, Autoplay, EffectFade]}
           slidesPerView={1}
@@ -229,7 +233,6 @@ const Dashboard = () => {
                 />
                 <div className="absolute inset-0 bg-linear-to-r from-black via-black/60 to-transparent" />
                 <div className="absolute inset-0 bg-linear-to-t from-black via-transparent to-transparent" />
-
                 <div className="absolute bottom-0 left-0 p-10 md:p-16 max-w-2xl">
                   <span
                     style={{
@@ -248,15 +251,16 @@ const Dashboard = () => {
                   </p>
                   <div className="flex gap-4">
                     <button
-                      onClick={() => navigate(`/movie/${movie.id}`)}
+                      onClick={() =>
+                        navigate(`/details/${movie.type}/${movie.id}`)
+                      }
                       style={{
                         background: "var(--accent)",
                         color: "var(--bg-primary)",
                       }}
                       className="flex items-center gap-2 px-6 py-3 rounded-xl font-raleway font-bold text-sm hover:opacity-90 transition-all duration-300"
                     >
-                      <Info size={16} />
-                      View Details
+                      <Info size={16} /> View Details
                     </button>
                     <button
                       onClick={() => setActiveTrailer(movie.trailerKey)}
@@ -267,8 +271,7 @@ const Dashboard = () => {
                       }}
                       className="flex items-center gap-2 px-6 py-3 rounded-xl font-raleway font-bold text-sm hover:bg-white/20 transition-all duration-300"
                     >
-                      <Play size={16} />
-                      Watch Trailer
+                      <Play size={16} /> Watch Trailer
                     </button>
                   </div>
                 </div>
@@ -278,7 +281,7 @@ const Dashboard = () => {
         </Swiper>
 
         <div className="px-6 md:px-12 py-10 flex flex-col gap-12">
-          {/* ── Trending ── */}
+          {/* Trending — movies + TV from API */}
           <div>
             <h2
               style={{ color: "var(--text-primary)" }}
@@ -287,22 +290,25 @@ const Dashboard = () => {
               Trending Now
             </h2>
             <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-              {trending.map((movie) => (
-                <div key={movie.id} className="min-w-45">
+              {trending.map((item) => (
+                <div key={item.id} className="min-w-45">
                   <MovieCard
-                    id={movie.id}
-                    title={movie.title}
-                    poster={movie.poster_path}
-                    rating={movie.vote_average}
-                    year={movie.release_date?.split("-")[0]}
-                    description={movie.overview}
+                    id={item.id}
+                    title={item.title || item.name}
+                    poster={item.poster_path}
+                    rating={item.vote_average}
+                    year={
+                      (item.release_date || item.first_air_date)?.split("-")[0]
+                    }
+                    description={item.overview}
+                    mediaType={item.media_type}
                   />
                 </div>
               ))}
             </div>
           </div>
 
-          {/* ── Top Rated + Genre Filter ── */}
+          {/* Top Rated + Genre filter */}
           <div>
             <h2
               style={{ color: "var(--text-primary)" }}
@@ -310,8 +316,6 @@ const Dashboard = () => {
             >
               Top Rated
             </h2>
-
-            {/* Genre chips */}
             <div className="flex gap-3 flex-wrap mb-8">
               <button
                 onClick={() => setActiveGenre(null)}
@@ -354,7 +358,6 @@ const Dashboard = () => {
               ))}
             </div>
 
-            {/* Movie grid */}
             {loadingMore && topRated.length === 0 ? (
               <p
                 style={{ color: "var(--accent)" }}
@@ -365,15 +368,20 @@ const Dashboard = () => {
             ) : (
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {topRated.map((movie) => (
+                  {topRated.map((item) => (
                     <MovieCard
-                      key={movie.id}
-                      id={movie.id}
-                      title={movie.title}
-                      poster={movie.poster_path}
-                      rating={movie.vote_average}
-                      year={movie.release_date?.split("-")[0]}
-                      description={movie.overview}
+                      key={item.id}
+                      id={item.id}
+                      title={item.title || item.name}
+                      poster={item.poster_path}
+                      rating={item.vote_average}
+                      year={
+                        (item.release_date || item.first_air_date)?.split(
+                          "-",
+                        )[0]
+                      }
+                      description={item.overview}
+                      mediaType={item.media_type || "movie"}
                     />
                   ))}
                 </div>

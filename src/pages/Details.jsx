@@ -8,8 +8,7 @@ const TMDB_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p";
 
-// ─── Skeleton ───────────────────────────────────────────────────────────────
-
+// ─── Skeleton ────────────────────────────────────────────────────────────────
 const SkeletonBox = ({ className = "" }) => (
   <div
     className={`rounded-md animate-pulse ${className}`}
@@ -50,12 +49,11 @@ const DetailSkeleton = () => (
       <SkeletonBox className="w-full h-4" />
       <SkeletonBox className="w-5/6 h-4" />
       <SkeletonBox className="w-4/6 h-4" />
-      <div className="grid grid-cols-3 gap-6 mt-6">
-        {[1, 2, 3].map((i) => (
+      <div className="grid grid-cols-4 gap-4 mt-6">
+        {[1, 2, 3, 4].map((i) => (
           <SkeletonBox key={i} className="h-20 rounded-xl" />
         ))}
       </div>
-      {/* Cast skeleton */}
       <div className="flex gap-4 mt-4">
         {[1, 2, 3, 4, 5].map((i) => (
           <div
@@ -72,8 +70,7 @@ const DetailSkeleton = () => (
   </div>
 );
 
-// ─── Stat Card ──────────────────────────────────────────────────────────────
-
+// ─── Stat Card ────────────────────────────────────────────────────────────────
 const StatCard = ({ label, value, icon }) => (
   <div
     className="flex flex-col gap-1 px-5 py-4 rounded-2xl"
@@ -97,8 +94,7 @@ const StatCard = ({ label, value, icon }) => (
   </div>
 );
 
-// ─── Trailer Modal ──────────────────────────────────────────────────────────
-
+// ─── Trailer Modal ────────────────────────────────────────────────────────────
 const TrailerModal = ({ videoKey, onClose }) => (
   <AnimatePresence>
     <motion.div
@@ -141,8 +137,7 @@ const TrailerModal = ({ videoKey, onClose }) => (
   </AnimatePresence>
 );
 
-// ─── Cast Card ──────────────────────────────────────────────────────────────
-
+// ─── Cast Card ────────────────────────────────────────────────────────────────
 const CastCard = ({ actor, index }) => (
   <motion.div
     className="flex flex-col items-center gap-2 flex-shrink-0 w-24"
@@ -192,14 +187,13 @@ const CastCard = ({ actor, index }) => (
   </motion.div>
 );
 
-// ─── Main Component ─────────────────────────────────────────────────────────
-
-const MovieDetails = () => {
-  const { id } = useParams();
+// ─── Main ─────────────────────────────────────────────────────────────────────
+const Details = () => {
+  const { type, id } = useParams(); // type = "movie" | "tv"
   const navigate = useNavigate();
   const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist();
 
-  const [movie, setMovie] = useState(null);
+  const [data, setData] = useState(null);
   const [trailerKey, setTrailerKey] = useState(null);
   const [cast, setCast] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -209,23 +203,25 @@ const MovieDetails = () => {
   const isInWatchlist = watchlist.some((m) => m.id === Number(id));
 
   useEffect(() => {
-    const fetchMovie = async () => {
+    const fetchDetails = async () => {
       setLoading(true);
       try {
         const [detailRes, videoRes, creditsRes] = await Promise.all([
-          fetch(`${TMDB_BASE}/movie/${id}?api_key=${TMDB_KEY}&language=en-US`),
           fetch(
-            `${TMDB_BASE}/movie/${id}/videos?api_key=${TMDB_KEY}&language=en-US`,
+            `${TMDB_BASE}/${type}/${id}?api_key=${TMDB_KEY}&language=en-US`,
           ),
           fetch(
-            `${TMDB_BASE}/movie/${id}/credits?api_key=${TMDB_KEY}&language=en-US`,
+            `${TMDB_BASE}/${type}/${id}/videos?api_key=${TMDB_KEY}&language=en-US`,
+          ),
+          fetch(
+            `${TMDB_BASE}/${type}/${id}/credits?api_key=${TMDB_KEY}&language=en-US`,
           ),
         ]);
         const detail = await detailRes.json();
         const videos = await videoRes.json();
         const credits = await creditsRes.json();
 
-        setMovie(detail);
+        setData(detail);
         setCast(credits.cast?.slice(0, 15) || []);
 
         const trailer = videos.results?.find(
@@ -233,13 +229,13 @@ const MovieDetails = () => {
         );
         if (trailer) setTrailerKey(trailer.key);
       } catch (err) {
-        console.error("Failed to fetch movie:", err);
+        console.error("Failed to fetch details:", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchMovie();
-  }, [id]);
+    fetchDetails();
+  }, [type, id]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -252,41 +248,54 @@ const MovieDetails = () => {
       showToast("Removed from Watchlist");
     } else {
       addToWatchlist({
-        id: movie.id,
-        title: movie.title,
-        poster_path: movie.poster_path,
-        vote_average: movie.vote_average,
-        release_date: movie.release_date,
+        id: data.id,
+        title: data.title || data.name,
+        poster_path: data.poster_path,
+        vote_average: data.vote_average,
+        release_date: data.release_date || data.first_air_date,
+        media_type: type,
       });
       showToast("Added to Watchlist ✓");
     }
   };
 
   if (loading) return <DetailSkeleton />;
-  if (!movie)
+  if (!data)
     return (
       <div
         className="min-h-screen flex items-center justify-center"
         style={{ color: "var(--text-secondary)" }}
       >
-        Movie not found.
+        Not found.
       </div>
     );
 
-  const backdropUrl = movie.backdrop_path
-    ? `${IMG_BASE}/original${movie.backdrop_path}`
+  // normalize movie vs tv fields
+  const title = data.title || data.name;
+  const year =
+    (data.release_date || data.first_air_date)?.split("-")[0] || "N/A";
+  const backdropUrl = data.backdrop_path
+    ? `${IMG_BASE}/original${data.backdrop_path}`
     : null;
-  const posterUrl = movie.poster_path
-    ? `${IMG_BASE}/w500${movie.poster_path}`
+  const posterUrl = data.poster_path
+    ? `${IMG_BASE}/w500${data.poster_path}`
     : "https://via.placeholder.com/500x750?text=No+Poster";
-  const year = movie.release_date?.split("-")[0] || "N/A";
-  const rating = movie.vote_average?.toFixed(1) || "N/A";
-  const runtime = movie.runtime
-    ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m`
-    : "N/A";
-  const language = movie.original_language?.toUpperCase() || "N/A";
-  const popularity = movie.popularity?.toFixed(0) || "N/A";
-  const genres = movie.genres?.map((g) => g.name) || [];
+  const rating = data.vote_average?.toFixed(1) || "N/A";
+  const language = data.original_language?.toUpperCase() || "N/A";
+  const popularity = data.popularity?.toFixed(0) || "N/A";
+  const genres = data.genres?.map((g) => g.name) || [];
+
+  // movie-only
+  const runtime = data.runtime
+    ? `${Math.floor(data.runtime / 60)}h ${data.runtime % 60}m`
+    : null;
+  // tv-only
+  const seasons = data.number_of_seasons
+    ? `${data.number_of_seasons} Season${data.number_of_seasons > 1 ? "s" : ""}`
+    : null;
+  const episodes = data.number_of_episodes
+    ? `${data.number_of_episodes} Episodes`
+    : null;
 
   return (
     <PageTransition>
@@ -347,10 +356,10 @@ const MovieDetails = () => {
             }}
           />
 
-          {/* Back btn */}
+          {/* Back */}
           <motion.button
             onClick={() => navigate(-1)}
-            className="absolute top-6 left-6 z-20 flex items-center cursor-pointer gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all"
+            className="absolute top-6 left-6 z-20 flex items-center cursor-pointer gap-2 px-4 py-2 rounded-full text-sm font-medium"
             style={{
               background: "var(--bg-surface)",
               color: "var(--text-secondary)",
@@ -376,7 +385,7 @@ const MovieDetails = () => {
             >
               <img
                 src={posterUrl}
-                alt={movie.title}
+                alt={title}
                 className="w-44 md:w-52 rounded-2xl shadow-2xl object-cover"
                 style={{ border: "2px solid var(--border)" }}
               />
@@ -388,6 +397,19 @@ const MovieDetails = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.6 }}
             >
+              {/* TV badge */}
+              {type === "tv" && (
+                <span
+                  className="text-xs font-bold px-3 py-1 rounded-full w-fit"
+                  style={{
+                    background: "var(--accent)",
+                    color: "#0a0a0a",
+                    fontFamily: "var(--font-raleway)",
+                  }}
+                >
+                  TV Series
+                </span>
+              )}
               <h1
                 className="text-3xl md:text-5xl font-bold leading-tight"
                 style={{
@@ -396,9 +418,9 @@ const MovieDetails = () => {
                   textShadow: "0 2px 24px rgba(0,0,0,0.6)",
                 }}
               >
-                {movie.title}
+                {title}
               </h1>
-              {movie.tagline && (
+              {data.tagline && (
                 <p
                   className="text-sm italic"
                   style={{
@@ -406,7 +428,7 @@ const MovieDetails = () => {
                     fontFamily: "var(--font-raleway)",
                   }}
                 >
-                  "{movie.tagline}"
+                  "{data.tagline}"
                 </p>
               )}
               <div
@@ -418,19 +440,22 @@ const MovieDetails = () => {
               >
                 <span>{year}</span>
                 <span style={{ color: "var(--border)" }}>•</span>
-                <span>{runtime}</span>
-                <span style={{ color: "var(--border)" }}>•</span>
+                {runtime && (
+                  <>
+                    <span>{runtime}</span>
+                    <span style={{ color: "var(--border)" }}>•</span>
+                  </>
+                )}
+                {seasons && (
+                  <>
+                    <span>{seasons}</span>
+                    <span style={{ color: "var(--border)" }}>•</span>
+                  </>
+                )}
                 <span className="flex items-center gap-1">
                   ⭐{" "}
                   <strong style={{ color: "var(--accent)" }}>{rating}</strong>
-                  <span
-                    style={{
-                      color: "var(--text-secondary)",
-                      fontSize: "0.7rem",
-                    }}
-                  >
-                    /10
-                  </span>
+                  <span style={{ fontSize: "0.7rem" }}>/10</span>
                 </span>
                 <span style={{ color: "var(--border)" }}>•</span>
                 <span>{language}</span>
@@ -457,7 +482,7 @@ const MovieDetails = () => {
                 {trailerKey && (
                   <motion.button
                     onClick={() => setShowTrailer(true)}
-                    className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold transition-all"
+                    className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold"
                     style={{
                       background: "var(--accent)",
                       color: "#0a0a0a",
@@ -471,7 +496,7 @@ const MovieDetails = () => {
                 )}
                 <motion.button
                   onClick={handleWatchlist}
-                  className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold transition-all"
+                  className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold"
                   style={{
                     background: isInWatchlist
                       ? "var(--bg-surface)"
@@ -495,7 +520,7 @@ const MovieDetails = () => {
         {/* Body */}
         <div className="max-w-5xl mx-auto px-8 md:px-14 py-10 flex flex-col gap-10">
           {/* Overview */}
-          {movie.overview && (
+          {data.overview && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -518,7 +543,7 @@ const MovieDetails = () => {
                   maxWidth: "72ch",
                 }}
               >
-                {movie.overview}
+                {data.overview}
               </p>
             </motion.div>
           )}
@@ -532,11 +557,19 @@ const MovieDetails = () => {
           >
             <StatCard label="Rating" value={`${rating} / 10`} icon="⭐" />
             <StatCard label="Popularity" value={`#${popularity}`} icon="🔥" />
-            <StatCard label="Runtime" value={runtime} icon="🕐" />
+            {type === "movie" && runtime && (
+              <StatCard label="Runtime" value={runtime} icon="🕐" />
+            )}
+            {type === "tv" && seasons && (
+              <StatCard label="Seasons" value={seasons} icon="📺" />
+            )}
+            {type === "tv" && episodes && (
+              <StatCard label="Episodes" value={episodes} icon="🎬" />
+            )}
             <StatCard label="Language" value={language} icon="🌐" />
           </motion.div>
 
-          {/* Cast Section */}
+          {/* Cast */}
           {cast.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -560,14 +593,14 @@ const MovieDetails = () => {
             </motion.div>
           )}
 
-          {/* Extra Details */}
+          {/* Extra */}
           <motion.div
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
           >
-            {movie.production_companies?.length > 0 && (
+            {data.production_companies?.length > 0 && (
               <div>
                 <h2
                   className="text-xs uppercase tracking-widest mb-2"
@@ -585,11 +618,11 @@ const MovieDetails = () => {
                     fontSize: "0.9rem",
                   }}
                 >
-                  {movie.production_companies.map((c) => c.name).join(", ")}
+                  {data.production_companies.map((c) => c.name).join(", ")}
                 </p>
               </div>
             )}
-            {movie.budget > 0 && (
+            {data.budget > 0 && (
               <div>
                 <h2
                   className="text-xs uppercase tracking-widest mb-2"
@@ -607,11 +640,11 @@ const MovieDetails = () => {
                     fontSize: "0.9rem",
                   }}
                 >
-                  ${movie.budget.toLocaleString()}
+                  ${data.budget.toLocaleString()}
                 </p>
               </div>
             )}
-            {movie.revenue > 0 && (
+            {data.revenue > 0 && (
               <div>
                 <h2
                   className="text-xs uppercase tracking-widest mb-2"
@@ -629,11 +662,11 @@ const MovieDetails = () => {
                     fontSize: "0.9rem",
                   }}
                 >
-                  ${movie.revenue.toLocaleString()}
+                  ${data.revenue.toLocaleString()}
                 </p>
               </div>
             )}
-            {movie.status && (
+            {data.status && (
               <div>
                 <h2
                   className="text-xs uppercase tracking-widest mb-2"
@@ -651,7 +684,29 @@ const MovieDetails = () => {
                     fontSize: "0.9rem",
                   }}
                 >
-                  {movie.status}
+                  {data.status}
+                </p>
+              </div>
+            )}
+            {type === "tv" && data.networks?.length > 0 && (
+              <div>
+                <h2
+                  className="text-xs uppercase tracking-widest mb-2"
+                  style={{
+                    color: "var(--text-secondary)",
+                    fontFamily: "var(--font-raleway)",
+                  }}
+                >
+                  Network
+                </h2>
+                <p
+                  style={{
+                    color: "var(--text-primary)",
+                    fontFamily: "var(--font-raleway)",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  {data.networks.map((n) => n.name).join(", ")}
                 </p>
               </div>
             )}
@@ -662,4 +717,4 @@ const MovieDetails = () => {
   );
 };
 
-export default MovieDetails;
+export default Details;
