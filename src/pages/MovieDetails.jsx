@@ -1,11 +1,586 @@
-import React from "react";
-import Navbar from "../components/layout/Navbar";
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import PageTransition from "../components/layout/PageTransition";
+import { useWatchlist } from "../context/WatchlistContext";
+
+const TMDB_KEY = import.meta.env.VITE_TMDB_API_KEY;
+const TMDB_BASE = "https://api.themoviedb.org/3";
+const IMG_BASE = "https://image.tmdb.org/t/p";
+
+// ─── Skeleton Components ───────────────────────────────────────────────────
+
+const SkeletonBox = ({ className = "" }) => (
+  <div
+    className={`rounded-md animate-pulse ${className}`}
+    style={{ background: "var(--border)", opacity: 0.6 }}
+  />
+);
+
+const DetailSkeleton = () => (
+  <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
+    {/* Hero skeleton */}
+    <div className="relative w-full" style={{ height: "520px" }}>
+      <SkeletonBox className="absolute inset-0 rounded-none" />
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(to right, var(--bg-primary) 35%, transparent 70%)",
+        }}
+      />
+      <div className="absolute bottom-10 left-10 flex gap-8 items-end">
+        <SkeletonBox className="w-44 h-64 rounded-xl flex-shrink-0" />
+        <div className="flex flex-col gap-4 pb-2">
+          <SkeletonBox className="w-72 h-8" />
+          <SkeletonBox className="w-48 h-4" />
+          <SkeletonBox className="w-40 h-4" />
+          <div className="flex gap-2 mt-2">
+            {[1, 2, 3].map((i) => (
+              <SkeletonBox key={i} className="w-20 h-7 rounded-full" />
+            ))}
+          </div>
+          <div className="flex gap-3 mt-4">
+            <SkeletonBox className="w-36 h-11 rounded-full" />
+            <SkeletonBox className="w-36 h-11 rounded-full" />
+          </div>
+        </div>
+      </div>
+    </div>
+    {/* Body skeleton */}
+    <div className="max-w-5xl mx-auto px-8 py-10 flex flex-col gap-6">
+      <SkeletonBox className="w-full h-4" />
+      <SkeletonBox className="w-5/6 h-4" />
+      <SkeletonBox className="w-4/6 h-4" />
+      <div className="grid grid-cols-3 gap-6 mt-6">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBox key={i} className="h-20 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// ─── Stat Card ─────────────────────────────────────────────────────────────
+
+const StatCard = ({ label, value, icon }) => (
+  <div
+    className="flex flex-col gap-1 px-5 py-4 rounded-2xl"
+    style={{
+      background: "var(--bg-surface)",
+      border: "1px solid var(--border)",
+    }}
+  >
+    <span
+      className="text-xs uppercase tracking-widest"
+      style={{ color: "var(--text-secondary)" }}
+    >
+      {icon} {label}
+    </span>
+    <span
+      className="text-lg font-semibold"
+      style={{ color: "var(--text-primary)", fontFamily: "var(--font-cinzel)" }}
+    >
+      {value}
+    </span>
+  </div>
+);
+
+// ─── Trailer Modal ──────────────────────────────────────────────────────────
+
+const TrailerModal = ({ videoKey, onClose }) => (
+  <AnimatePresence>
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="relative w-full max-w-4xl rounded-2xl overflow-hidden"
+        style={{ aspectRatio: "16/9", border: "1px solid var(--border)" }}
+        initial={{ scale: 0.88, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.88, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 22 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <iframe
+          src={`https://www.youtube.com/embed/${videoKey}?autoplay=1`}
+          title="Trailer"
+          allow="autoplay; fullscreen"
+          className="w-full h-full"
+          style={{ border: "none" }}
+        />
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center text-lg font-bold transition-all"
+          style={{
+            background: "var(--bg-surface)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          ✕
+        </button>
+      </motion.div>
+    </motion.div>
+  </AnimatePresence>
+);
+
+// ─── Main Component ─────────────────────────────────────────────────────────
 
 const MovieDetails = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const { watchlist, addToWatchlist, removeFromWatchlist } = useWatchlist();
+
+  const [movie, setMovie] = useState(null);
+  const [trailerKey, setTrailerKey] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [toastMsg, setToastMsg] = useState("");
+
+  const isInWatchlist = watchlist.some((m) => m.id === Number(id));
+
+  useEffect(() => {
+    const fetchMovie = async () => {
+      setLoading(true);
+      try {
+        const [detailRes, videoRes] = await Promise.all([
+          fetch(`${TMDB_BASE}/movie/${id}?api_key=${TMDB_KEY}&language=en-US`),
+          fetch(
+            `${TMDB_BASE}/movie/${id}/videos?api_key=${TMDB_KEY}&language=en-US`,
+          ),
+        ]);
+        const detail = await detailRes.json();
+        const videos = await videoRes.json();
+
+        setMovie(detail);
+
+        const trailer = videos.results?.find(
+          (v) => v.type === "Trailer" && v.site === "YouTube",
+        );
+        if (trailer) setTrailerKey(trailer.key);
+      } catch (err) {
+        console.error("Failed to fetch movie:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMovie();
+  }, [id]);
+
+  const showToast = (msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(""), 2500);
+  };
+
+  const handleWatchlist = () => {
+    if (isInWatchlist) {
+      removeFromWatchlist(Number(id));
+      showToast("Removed from Watchlist");
+    } else {
+      addToWatchlist({
+        id: movie.id,
+        title: movie.title,
+        poster_path: movie.poster_path,
+        vote_average: movie.vote_average,
+        release_date: movie.release_date,
+      });
+      showToast("Added to Watchlist ✓");
+    }
+  };
+
+  if (loading) return <DetailSkeleton />;
+  if (!movie)
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        Movie not found.
+      </div>
+    );
+
+  const backdropUrl = movie.backdrop_path
+    ? `${IMG_BASE}/original${movie.backdrop_path}`
+    : null;
+  const posterUrl = movie.poster_path
+    ? `${IMG_BASE}/w500${movie.poster_path}`
+    : "https://via.placeholder.com/500x750?text=No+Poster";
+
+  const year = movie.release_date?.split("-")[0] || "N/A";
+  const rating = movie.vote_average?.toFixed(1) || "N/A";
+  const runtime = movie.runtime
+    ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m`
+    : "N/A";
+  const language = movie.original_language?.toUpperCase() || "N/A";
+  const popularity = movie.popularity?.toFixed(0) || "N/A";
+  const genres = movie.genres?.map((g) => g.name) || [];
+
   return (
     <PageTransition>
-      <section></section>
+      <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
+        {/* ── Toast ── */}
+        <AnimatePresence>
+          {toastMsg && (
+            <motion.div
+              className="fixed top-6 right-6 z-50 px-5 py-3 rounded-xl text-sm font-medium shadow-xl"
+              style={{
+                background: "var(--accent)",
+                color: "#0a0a0a",
+                fontFamily: "var(--font-raleway)",
+              }}
+              initial={{ opacity: 0, y: -16, scale: 0.92 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.92 }}
+            >
+              {toastMsg}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ── Trailer Modal ── */}
+        {showTrailer && trailerKey && (
+          <TrailerModal
+            videoKey={trailerKey}
+            onClose={() => setShowTrailer(false)}
+          />
+        )}
+
+        {/* ── Hero Section ── */}
+        <div
+          className="relative w-full overflow-hidden"
+          style={{ minHeight: "540px" }}
+        >
+          {/* Backdrop */}
+          {backdropUrl && (
+            <motion.div
+              className="absolute inset-0"
+              initial={{ scale: 1.06, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.9, ease: "easeOut" }}
+            >
+              <img
+                src={backdropUrl}
+                alt="backdrop"
+                className="w-full h-full object-cover"
+                style={{ filter: "brightness(0.45)" }}
+              />
+            </motion.div>
+          )}
+
+          {/* Gradient overlay */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: backdropUrl
+                ? "linear-gradient(to right, var(--bg-primary) 30%, transparent 65%, var(--bg-primary) 100%), linear-gradient(to top, var(--bg-primary) 0%, transparent 50%)"
+                : "var(--bg-primary)",
+            }}
+          />
+
+          {/* Back button */}
+          <motion.button
+            onClick={() => navigate(-1)}
+            className="absolute top-6 left-6 z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all"
+            style={{
+              background: "var(--bg-surface)",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+              fontFamily: "var(--font-raleway)",
+            }}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+          >
+            ← Back
+          </motion.button>
+
+          {/* Content */}
+          <div className="relative z-10 flex flex-col md:flex-row gap-8 items-end px-8 md:px-14 pb-12 pt-28">
+            {/* Poster */}
+            <motion.div
+              className="flex-shrink-0"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15, duration: 0.6 }}
+            >
+              <img
+                src={posterUrl}
+                alt={movie.title}
+                className="w-44 md:w-52 rounded-2xl shadow-2xl object-cover"
+                style={{ border: "2px solid var(--border)" }}
+              />
+            </motion.div>
+
+            {/* Info */}
+            <motion.div
+              className="flex flex-col gap-3 pb-1"
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25, duration: 0.6 }}
+            >
+              {/* Title */}
+              <h1
+                className="text-3xl md:text-5xl font-bold leading-tight"
+                style={{
+                  color: "var(--text-primary)",
+                  fontFamily: "var(--font-cinzel)",
+                  textShadow: "0 2px 24px rgba(0,0,0,0.6)",
+                }}
+              >
+                {movie.title}
+              </h1>
+
+              {/* Tagline */}
+              {movie.tagline && (
+                <p
+                  className="text-sm italic"
+                  style={{
+                    color: "var(--accent)",
+                    fontFamily: "var(--font-raleway)",
+                  }}
+                >
+                  "{movie.tagline}"
+                </p>
+              )}
+
+              {/* Meta row */}
+              <div
+                className="flex flex-wrap items-center gap-3 text-sm"
+                style={{
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-raleway)",
+                }}
+              >
+                <span>{year}</span>
+                <span style={{ color: "var(--border)" }}>•</span>
+                <span>{runtime}</span>
+                <span style={{ color: "var(--border)" }}>•</span>
+                <span className="flex items-center gap-1">
+                  ⭐{" "}
+                  <strong style={{ color: "var(--accent)" }}>{rating}</strong>
+                  <span
+                    style={{
+                      color: "var(--text-secondary)",
+                      fontSize: "0.7rem",
+                    }}
+                  >
+                    /10
+                  </span>
+                </span>
+                <span style={{ color: "var(--border)" }}>•</span>
+                <span>{language}</span>
+              </div>
+
+              {/* Genres */}
+              {genres.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {genres.map((g) => (
+                    <span
+                      key={g}
+                      className="px-3 py-1 rounded-full text-xs font-medium"
+                      style={{
+                        background: "var(--bg-surface)",
+                        color: "var(--text-primary)",
+                        border: "1px solid var(--border)",
+                        fontFamily: "var(--font-raleway)",
+                      }}
+                    >
+                      {g}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Buttons */}
+              <div className="flex flex-wrap gap-3 mt-3">
+                {trailerKey && (
+                  <motion.button
+                    onClick={() => setShowTrailer(true)}
+                    className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold transition-all"
+                    style={{
+                      background: "var(--accent)",
+                      color: "#0a0a0a",
+                      fontFamily: "var(--font-raleway)",
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.96 }}
+                  >
+                    ▶ Watch Trailer
+                  </motion.button>
+                )}
+                <motion.button
+                  onClick={handleWatchlist}
+                  className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold transition-all"
+                  style={{
+                    background: isInWatchlist
+                      ? "var(--bg-surface)"
+                      : "transparent",
+                    color: isInWatchlist
+                      ? "var(--accent)"
+                      : "var(--text-primary)",
+                    border: `1.5px solid ${isInWatchlist ? "var(--accent)" : "var(--border)"}`,
+                    fontFamily: "var(--font-raleway)",
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.96 }}
+                >
+                  {isInWatchlist ? "✓ In Watchlist" : "+ Add to Watchlist"}
+                </motion.button>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* ── Body ── */}
+        <div className="max-w-5xl mx-auto px-8 md:px-14 py-10 flex flex-col gap-10">
+          {/* Overview */}
+          {movie.overview && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <h2
+                className="text-xs uppercase tracking-widest mb-3"
+                style={{
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-raleway)",
+                }}
+              >
+                Overview
+              </h2>
+              <p
+                className="text-base leading-relaxed"
+                style={{
+                  color: "var(--text-primary)",
+                  fontFamily: "var(--font-raleway)",
+                  maxWidth: "72ch",
+                }}
+              >
+                {movie.overview}
+              </p>
+            </motion.div>
+          )}
+
+          {/* Stats Grid */}
+          <motion.div
+            className="grid grid-cols-2 md:grid-cols-4 gap-4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <StatCard label="Rating" value={`${rating} / 10`} icon="⭐" />
+            <StatCard label="Popularity" value={`#${popularity}`} icon="🔥" />
+            <StatCard label="Runtime" value={runtime} icon="🕐" />
+            <StatCard label="Language" value={language} icon="🌐" />
+          </motion.div>
+
+          {/* Extra Details */}
+          <motion.div
+            className="grid grid-cols-1 md:grid-cols-2 gap-6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            {movie.production_companies?.length > 0 && (
+              <div>
+                <h2
+                  className="text-xs uppercase tracking-widest mb-2"
+                  style={{
+                    color: "var(--text-secondary)",
+                    fontFamily: "var(--font-raleway)",
+                  }}
+                >
+                  Production
+                </h2>
+                <p
+                  style={{
+                    color: "var(--text-primary)",
+                    fontFamily: "var(--font-raleway)",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  {movie.production_companies.map((c) => c.name).join(", ")}
+                </p>
+              </div>
+            )}
+            {movie.budget > 0 && (
+              <div>
+                <h2
+                  className="text-xs uppercase tracking-widest mb-2"
+                  style={{
+                    color: "var(--text-secondary)",
+                    fontFamily: "var(--font-raleway)",
+                  }}
+                >
+                  Budget
+                </h2>
+                <p
+                  style={{
+                    color: "var(--text-primary)",
+                    fontFamily: "var(--font-raleway)",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  ${movie.budget.toLocaleString()}
+                </p>
+              </div>
+            )}
+            {movie.revenue > 0 && (
+              <div>
+                <h2
+                  className="text-xs uppercase tracking-widest mb-2"
+                  style={{
+                    color: "var(--text-secondary)",
+                    fontFamily: "var(--font-raleway)",
+                  }}
+                >
+                  Revenue
+                </h2>
+                <p
+                  style={{
+                    color: "var(--text-primary)",
+                    fontFamily: "var(--font-raleway)",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  ${movie.revenue.toLocaleString()}
+                </p>
+              </div>
+            )}
+            {movie.status && (
+              <div>
+                <h2
+                  className="text-xs uppercase tracking-widest mb-2"
+                  style={{
+                    color: "var(--text-secondary)",
+                    fontFamily: "var(--font-raleway)",
+                  }}
+                >
+                  Status
+                </h2>
+                <p
+                  style={{
+                    color: "var(--text-primary)",
+                    fontFamily: "var(--font-raleway)",
+                    fontSize: "0.9rem",
+                  }}
+                >
+                  {movie.status}
+                </p>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      </div>
     </PageTransition>
   );
 };
