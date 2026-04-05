@@ -1,16 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  getTrending,
-  getTopRated,
-  getMoviesByGenre,
-  IMAGE_BASE_URL,
-} from "../api/tmdb";
+import { getTrending, getTopRated, getMoviesByGenre } from "../api/tmdb";
 import MovieCard from "../components/ui/MovieCard";
 import PageTransition from "../components/layout/PageTransition";
 import { Pagination, Autoplay, EffectFade } from "swiper/modules";
-import { Play, Info } from "lucide-react";
-import { motion } from "framer-motion";
+import { Play, Info, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/pagination";
@@ -25,6 +20,7 @@ const genres = [
   { id: 18, name: "Drama" },
   { id: 12, name: "Adventure" },
 ];
+
 const heroMovies = [
   {
     id: 245891,
@@ -33,6 +29,7 @@ const heroMovies = [
     overview:
       "Ex-hitman John Wick comes out of retirement to track down the gangsters that took everything from him.",
     backdrop_path: "/fSwYa5q2xRkBoOOjueLpkLf3N1m.jpg",
+    trailerKey: "2AUmvWm5ZDQ",
   },
   {
     id: 19025,
@@ -41,6 +38,7 @@ const heroMovies = [
     overview:
       "A couple returns to the husband's ancestral home, disregarding warnings of a curse and paranormal phenomena.",
     backdrop_path: "/sRNFXlwXN441His0KxAeR62zRtj.jpg",
+    trailerKey: "L9bGFumFtPI",
   },
   {
     id: 138843,
@@ -49,6 +47,7 @@ const heroMovies = [
     overview:
       "Paranormal investigators Ed and Lorraine Warren work to help a family terrorized by a dark presence in their farmhouse.",
     backdrop_path: "/kHZaX0vuhZdbuq0WKU3BpA9WIQ0.jpg",
+    trailerKey: "k10ETZ41q5o",
   },
   {
     id: 99861,
@@ -57,6 +56,7 @@ const heroMovies = [
     overview:
       "Humanity fights for survival against giant humanoid creatures that have driven them behind massive walls.",
     backdrop_path: "/nB6IR9XfdRpVRKCz85uT97EjgwB.jpg",
+    trailerKey: "MGRm3WHqqQo",
   },
   {
     id: 157336,
@@ -65,6 +65,7 @@ const heroMovies = [
     overview:
       "A team of explorers travel through a wormhole in space in an attempt to ensure humanity's survival.",
     backdrop_path: "/2ssWTSVklAEc98frZUQhgtGHx7s.jpg",
+    trailerKey: "zSWdZVtXT7E",
   },
   {
     id: 284053,
@@ -73,21 +74,64 @@ const heroMovies = [
     overview:
       "A former neurosurgeon embarks on a journey of healing only to be drawn into the world of the mystic arts.",
     backdrop_path: "/3zvZ699gMW2RhWc0GisIukzq0Ls.jpg",
+    trailerKey: "HSzx-zryEgM",
   },
 ];
 
+// ── Trailer Modal ────────────────────────────────────────────────────────────
+const TrailerModal = ({ trailerKey, onClose }) => (
+  <AnimatePresence>
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(10px)" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="relative w-full max-w-4xl rounded-2xl overflow-hidden"
+        style={{ aspectRatio: "16/9", border: "1px solid var(--border)" }}
+        initial={{ scale: 0.88, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.88, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 22 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <iframe
+          src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1`}
+          title="Trailer"
+          allow="autoplay; fullscreen"
+          className="w-full h-full"
+          style={{ border: "none" }}
+        />
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all"
+          style={{
+            background: "var(--bg-surface)",
+            color: "var(--text-primary)",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <X size={16} />
+        </button>
+      </motion.div>
+    </motion.div>
+  </AnimatePresence>
+);
+
+// ── Dashboard ────────────────────────────────────────────────────────────────
 const Dashboard = () => {
   const [trending, setTrending] = useState([]);
   const [topRated, setTopRated] = useState([]);
-  const [hero, setHero] = useState(null);
-  const [activeGenre, setActiveGenre] = useState(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
-
+  const [activeGenre, setActiveGenre] = useState(null);
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [activeTrailer, setActiveTrailer] = useState(null); // trailerKey string
+  const navigate = useNavigate();
 
-  // replace fetchData useEffect with this
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -97,7 +141,6 @@ const Dashboard = () => {
         ]);
         setTrending(trendingRes.data.results);
         setTopRated(topRatedRes.data.results);
-        setHero(trendingRes.data.results[0]);
       } catch (err) {
         console.error(err);
       } finally {
@@ -107,18 +150,14 @@ const Dashboard = () => {
     fetchData();
   }, []);
 
-  // add this useEffect for genre filtering
   useEffect(() => {
     const fetchByGenre = async () => {
       setLoadingMore(true);
       try {
-        if (activeGenre) {
-          const res = await getMoviesByGenre(activeGenre, 1);
-          setTopRated(res.data.results);
-        } else {
-          const res = await getTopRated();
-          setTopRated(res.data.results);
-        }
+        const res = activeGenre
+          ? await getMoviesByGenre(activeGenre, 1)
+          : await getTopRated();
+        setTopRated(res.data.results);
         setPage(1);
       } catch (err) {
         console.error(err);
@@ -129,7 +168,6 @@ const Dashboard = () => {
     fetchByGenre();
   }, [activeGenre]);
 
-  // load more function
   const loadMore = async () => {
     setLoadingMore(true);
     try {
@@ -164,8 +202,16 @@ const Dashboard = () => {
 
   return (
     <PageTransition>
+      {/* Trailer Modal */}
+      {activeTrailer && (
+        <TrailerModal
+          trailerKey={activeTrailer}
+          onClose={() => setActiveTrailer(null)}
+        />
+      )}
+
       <section style={{ background: "var(--bg-primary)", minHeight: "100vh" }}>
-        {/* hero section */}
+        {/* ── Hero Swiper ── */}
         <Swiper
           modules={[Pagination, Autoplay, EffectFade]}
           slidesPerView={1}
@@ -213,6 +259,7 @@ const Dashboard = () => {
                       View Details
                     </button>
                     <button
+                      onClick={() => setActiveTrailer(movie.trailerKey)}
                       style={{
                         background: "rgba(255,255,255,0.1)",
                         border: "1px solid rgba(255,255,255,0.2)",
@@ -229,8 +276,9 @@ const Dashboard = () => {
             </SwiperSlide>
           ))}
         </Swiper>
+
         <div className="px-6 md:px-12 py-10 flex flex-col gap-12">
-          {/* trending now */}
+          {/* ── Trending ── */}
           <div>
             <h2
               style={{ color: "var(--text-primary)" }}
@@ -254,7 +302,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* genre chips + top rated */}
+          {/* ── Top Rated + Genre Filter ── */}
           <div>
             <h2
               style={{ color: "var(--text-primary)" }}
@@ -263,7 +311,7 @@ const Dashboard = () => {
               Top Rated
             </h2>
 
-            {/* genre chips */}
+            {/* Genre chips */}
             <div className="flex gap-3 flex-wrap mb-8">
               <button
                 onClick={() => setActiveGenre(null)}
@@ -306,7 +354,7 @@ const Dashboard = () => {
               ))}
             </div>
 
-            {/* movie grid */}
+            {/* Movie grid */}
             {loadingMore && topRated.length === 0 ? (
               <p
                 style={{ color: "var(--accent)" }}
@@ -329,8 +377,6 @@ const Dashboard = () => {
                     />
                   ))}
                 </div>
-
-                {/* load more */}
                 <div className="flex justify-center mt-10">
                   <button
                     onClick={loadMore}

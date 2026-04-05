@@ -8,7 +8,7 @@ const TMDB_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const IMG_BASE = "https://image.tmdb.org/t/p";
 
-// ─── Skeleton Components ───────────────────────────────────────────────────
+// ─── Skeleton ───────────────────────────────────────────────────────────────
 
 const SkeletonBox = ({ className = "" }) => (
   <div
@@ -19,7 +19,6 @@ const SkeletonBox = ({ className = "" }) => (
 
 const DetailSkeleton = () => (
   <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
-    {/* Hero skeleton */}
     <div className="relative w-full" style={{ height: "520px" }}>
       <SkeletonBox className="absolute inset-0 rounded-none" />
       <div
@@ -47,7 +46,6 @@ const DetailSkeleton = () => (
         </div>
       </div>
     </div>
-    {/* Body skeleton */}
     <div className="max-w-5xl mx-auto px-8 py-10 flex flex-col gap-6">
       <SkeletonBox className="w-full h-4" />
       <SkeletonBox className="w-5/6 h-4" />
@@ -57,11 +55,24 @@ const DetailSkeleton = () => (
           <SkeletonBox key={i} className="h-20 rounded-xl" />
         ))}
       </div>
+      {/* Cast skeleton */}
+      <div className="flex gap-4 mt-4">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div
+            key={i}
+            className="flex flex-col items-center gap-2 flex-shrink-0"
+          >
+            <SkeletonBox className="w-20 h-20 rounded-full" />
+            <SkeletonBox className="w-16 h-3" />
+            <SkeletonBox className="w-12 h-3" />
+          </div>
+        ))}
+      </div>
     </div>
   </div>
 );
 
-// ─── Stat Card ─────────────────────────────────────────────────────────────
+// ─── Stat Card ──────────────────────────────────────────────────────────────
 
 const StatCard = ({ label, value, icon }) => (
   <div
@@ -130,6 +141,57 @@ const TrailerModal = ({ videoKey, onClose }) => (
   </AnimatePresence>
 );
 
+// ─── Cast Card ──────────────────────────────────────────────────────────────
+
+const CastCard = ({ actor, index }) => (
+  <motion.div
+    className="flex flex-col items-center gap-2 flex-shrink-0 w-24"
+    initial={{ opacity: 0, y: 16 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: 0.6 + index * 0.05 }}
+  >
+    <div
+      className="w-20 h-20 rounded-full overflow-hidden flex-shrink-0"
+      style={{ border: "2px solid var(--border)" }}
+    >
+      {actor.profile_path ? (
+        <img
+          src={`${IMG_BASE}/w185${actor.profile_path}`}
+          alt={actor.name}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div
+          className="w-full h-full flex items-center justify-center text-2xl"
+          style={{ background: "var(--bg-surface)" }}
+        >
+          🎭
+        </div>
+      )}
+    </div>
+    <div className="text-center">
+      <p
+        className="text-xs font-semibold leading-tight"
+        style={{
+          color: "var(--text-primary)",
+          fontFamily: "var(--font-raleway)",
+        }}
+      >
+        {actor.name}
+      </p>
+      <p
+        className="text-xs mt-0.5 leading-tight"
+        style={{
+          color: "var(--text-secondary)",
+          fontFamily: "var(--font-raleway)",
+        }}
+      >
+        {actor.character}
+      </p>
+    </div>
+  </motion.div>
+);
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 const MovieDetails = () => {
@@ -139,6 +201,7 @@ const MovieDetails = () => {
 
   const [movie, setMovie] = useState(null);
   const [trailerKey, setTrailerKey] = useState(null);
+  const [cast, setCast] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showTrailer, setShowTrailer] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
@@ -149,16 +212,21 @@ const MovieDetails = () => {
     const fetchMovie = async () => {
       setLoading(true);
       try {
-        const [detailRes, videoRes] = await Promise.all([
+        const [detailRes, videoRes, creditsRes] = await Promise.all([
           fetch(`${TMDB_BASE}/movie/${id}?api_key=${TMDB_KEY}&language=en-US`),
           fetch(
             `${TMDB_BASE}/movie/${id}/videos?api_key=${TMDB_KEY}&language=en-US`,
           ),
+          fetch(
+            `${TMDB_BASE}/movie/${id}/credits?api_key=${TMDB_KEY}&language=en-US`,
+          ),
         ]);
         const detail = await detailRes.json();
         const videos = await videoRes.json();
+        const credits = await creditsRes.json();
 
         setMovie(detail);
+        setCast(credits.cast?.slice(0, 15) || []);
 
         const trailer = videos.results?.find(
           (v) => v.type === "Trailer" && v.site === "YouTube",
@@ -211,7 +279,6 @@ const MovieDetails = () => {
   const posterUrl = movie.poster_path
     ? `${IMG_BASE}/w500${movie.poster_path}`
     : "https://via.placeholder.com/500x750?text=No+Poster";
-
   const year = movie.release_date?.split("-")[0] || "N/A";
   const rating = movie.vote_average?.toFixed(1) || "N/A";
   const runtime = movie.runtime
@@ -224,7 +291,7 @@ const MovieDetails = () => {
   return (
     <PageTransition>
       <div className="min-h-screen" style={{ background: "var(--bg-primary)" }}>
-        {/* ── Toast ── */}
+        {/* Toast */}
         <AnimatePresence>
           {toastMsg && (
             <motion.div
@@ -243,7 +310,7 @@ const MovieDetails = () => {
           )}
         </AnimatePresence>
 
-        {/* ── Trailer Modal ── */}
+        {/* Trailer Modal */}
         {showTrailer && trailerKey && (
           <TrailerModal
             videoKey={trailerKey}
@@ -251,12 +318,11 @@ const MovieDetails = () => {
           />
         )}
 
-        {/* ── Hero Section ── */}
+        {/* Hero */}
         <div
           className="relative w-full overflow-hidden"
           style={{ minHeight: "540px" }}
         >
-          {/* Backdrop */}
           {backdropUrl && (
             <motion.div
               className="absolute inset-0"
@@ -272,8 +338,6 @@ const MovieDetails = () => {
               />
             </motion.div>
           )}
-
-          {/* Gradient overlay */}
           <div
             className="absolute inset-0"
             style={{
@@ -283,10 +347,10 @@ const MovieDetails = () => {
             }}
           />
 
-          {/* Back button */}
+          {/* Back btn */}
           <motion.button
             onClick={() => navigate(-1)}
-            className="absolute top-6 left-6 z-10 flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all"
+            className="absolute top-6 left-6 z-20 flex items-center cursor-pointer gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all"
             style={{
               background: "var(--bg-surface)",
               color: "var(--text-secondary)",
@@ -304,7 +368,6 @@ const MovieDetails = () => {
 
           {/* Content */}
           <div className="relative z-10 flex flex-col md:flex-row gap-8 items-end px-8 md:px-14 pb-12 pt-28">
-            {/* Poster */}
             <motion.div
               className="flex-shrink-0"
               initial={{ opacity: 0, y: 30 }}
@@ -319,14 +382,12 @@ const MovieDetails = () => {
               />
             </motion.div>
 
-            {/* Info */}
             <motion.div
               className="flex flex-col gap-3 pb-1"
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.6 }}
             >
-              {/* Title */}
               <h1
                 className="text-3xl md:text-5xl font-bold leading-tight"
                 style={{
@@ -337,8 +398,6 @@ const MovieDetails = () => {
               >
                 {movie.title}
               </h1>
-
-              {/* Tagline */}
               {movie.tagline && (
                 <p
                   className="text-sm italic"
@@ -350,8 +409,6 @@ const MovieDetails = () => {
                   "{movie.tagline}"
                 </p>
               )}
-
-              {/* Meta row */}
               <div
                 className="flex flex-wrap items-center gap-3 text-sm"
                 style={{
@@ -378,8 +435,6 @@ const MovieDetails = () => {
                 <span style={{ color: "var(--border)" }}>•</span>
                 <span>{language}</span>
               </div>
-
-              {/* Genres */}
               {genres.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-1">
                   {genres.map((g) => (
@@ -398,8 +453,6 @@ const MovieDetails = () => {
                   ))}
                 </div>
               )}
-
-              {/* Buttons */}
               <div className="flex flex-wrap gap-3 mt-3">
                 {trailerKey && (
                   <motion.button
@@ -439,7 +492,7 @@ const MovieDetails = () => {
           </div>
         </div>
 
-        {/* ── Body ── */}
+        {/* Body */}
         <div className="max-w-5xl mx-auto px-8 md:px-14 py-10 flex flex-col gap-10">
           {/* Overview */}
           {movie.overview && (
@@ -470,7 +523,7 @@ const MovieDetails = () => {
             </motion.div>
           )}
 
-          {/* Stats Grid */}
+          {/* Stats */}
           <motion.div
             className="grid grid-cols-2 md:grid-cols-4 gap-4"
             initial={{ opacity: 0, y: 20 }}
@@ -482,6 +535,30 @@ const MovieDetails = () => {
             <StatCard label="Runtime" value={runtime} icon="🕐" />
             <StatCard label="Language" value={language} icon="🌐" />
           </motion.div>
+
+          {/* Cast Section */}
+          {cast.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55 }}
+            >
+              <h2
+                className="text-xs uppercase tracking-widest mb-5"
+                style={{
+                  color: "var(--text-secondary)",
+                  fontFamily: "var(--font-raleway)",
+                }}
+              >
+                Cast
+              </h2>
+              <div className="flex gap-5 overflow-x-auto pb-3 scrollbar-hide">
+                {cast.map((actor, index) => (
+                  <CastCard key={actor.id} actor={actor} index={index} />
+                ))}
+              </div>
+            </motion.div>
+          )}
 
           {/* Extra Details */}
           <motion.div
